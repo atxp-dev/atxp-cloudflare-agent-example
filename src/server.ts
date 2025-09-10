@@ -16,6 +16,9 @@ import {
 import { openai } from "@ai-sdk/openai";
 import { processToolCalls, cleanupMessages } from "./utils";
 import { tools, executions } from "./tools";
+import { findATXPAccount, imageService, filestoreService } from "./utils/atxp";
+import { atxpClient } from "@atxp/client";
+import { ConsoleLogger, LogLevel } from "@atxp/common";
 // import { env } from "cloudflare:workers";
 
 const model = openai("gpt-4o-2024-11-20");
@@ -24,6 +27,21 @@ const model = openai("gpt-4o-2024-11-20");
 //   apiKey: env.OPENAI_API_KEY,
 //   baseURL: env.GATEWAY_BASE_URL,
 // });
+
+/**
+ * Image generation task interface for state management
+ */
+interface ImageGenerationTask {
+  id: string;
+  prompt: string;
+  status: "pending" | "processing" | "completed" | "failed";
+  taskId?: string;
+  imageUrl?: string;
+  fileName?: string;
+  fileId?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
 
 /**
  * Chat Agent implementation that handles real-time AI chat interactions
@@ -61,7 +79,15 @@ export class Chat extends AIChatAgent<Env> {
         });
 
         const result = streamText({
-          system: `You are a helpful assistant that can do various tasks... 
+          system: `You are a helpful AI assistant that can generate images from text prompts using ATXP's image generation service.
+
+I have access to the following image generation capabilities:
+- generateImage: Create images from text prompts using ATXP Image MCP server
+- getImageGenerationStatus: Check the status of image generation tasks  
+- listImageGenerationTasks: List all image generation tasks
+
+When a user asks to generate or create an image, use the generateImage tool with their description as the prompt.
+I can also schedule tasks for later execution.
 
 ${unstable_getSchedulePrompt({ date: new Date() })}
 
@@ -102,6 +128,213 @@ If the user asks to schedule a task, use the schedule tool to schedule the task.
         }
       }
     ]);
+  }
+
+  /**
+   * Poll for image generation task completion
+   * This method is scheduled to run periodically for active image generation tasks
+   */
+  async pollImageGenerationTask(params: {
+    requestId: string;
+    taskId: string;
+    atxpConnectionString: string;
+  }) {
+    const { requestId, taskId, atxpConnectionString } = params;
+
+    try {
+      // Get the current task data
+      const taskData = await this.state.storage.get<ImageGenerationTask>(
+        `imageTask:${requestId}`
+      );
+
+      if (!taskData || taskData.status !== "processing") {
+        console.log(
+          `Task ${requestId} is not in processing state, stopping polling`
+        );
+        return;
+      }
+
+      // Get ATXP account
+      const account = findATXPAccount(atxpConnectionString);
+
+      // Create ATXP Image client
+      const imageClient = await atxpClient({
+        mcpServer: imageService.mcpServer,
+        account: account,
+        logger: new ConsoleLogger({ level: LogLevel.DEBUG }),
+        onPayment: async ({ payment }: { payment: any }) => {
+          console.log("Payment made to image service during polling:", payment);
+          await this.broadcast({
+            type: "payment-update",
+            taskId: requestId,
+            payment: {
+              accountId: payment.accountId,
+              resourceUrl: payment.resourceUrl,
+              resourceName: payment.resourceName,
+              network: payment.network,
+              currency: payment.currency,
+              amount: payment.amount.toString(),
+              iss: payment.iss
+            }
+          });
+        }
+      });
+
+      // Check the status of the image generation
+      const statusResult = await imageClient.callTool({
+        name: imageService.getImageAsyncToolName,
+        arguments: { taskId }
+      });
+
+      const { status, url } = imageService.getAsyncStatusResult(statusResult);
+      console.log(`Task ${taskId} status:`, status);
+
+      if (status === "completed" && url) {
+        console.log(`Task ${taskId} completed successfully. URL:`, url);
+
+        // Update task with completed status
+        taskData.status = "completed";
+        taskData.imageUrl = url;
+        taskData.updatedAt = new Date();
+
+        // Try to store in filestore
+        try {
+          // Send progress update for file storage
+          await this.broadcast({
+            type: "image-generation-storing",
+            taskId: requestId,
+            message: "Storing image in ATXP Filestore..."
+          });
+
+          // Create filestore client
+          const filestoreClient = await atxpClient({
+            mcpServer: filestoreService.mcpServer,
+            account: account,
+            onPayment: async ({ payment }: { payment: any }) => {
+              console.log("Payment made to filestore:", payment);
+              await this.broadcast({
+                type: "payment-update",
+                taskId: requestId,
+                payment: {
+                  accountId: payment.accountId,
+                  resourceUrl: payment.resourceUrl,
+                  resourceName: payment.resourceName,
+                  network: payment.network,
+                  currency: payment.currency,
+                  amount: payment.amount.toString(),
+                  iss: payment.iss
+                }
+              });
+            }
+          });
+
+          const filestoreResult = await filestoreClient.callTool({
+            name: filestoreService.toolName,
+            arguments: filestoreService.getArguments(url)
+          });
+
+          const fileResult = filestoreService.getResult(filestoreResult);
+          taskData.fileName = fileResult.filename;
+          taskData.imageUrl = fileResult.url; // Use filestore URL instead
+          taskData.fileId = fileResult.fileId || fileResult.filename;
+
+          console.log("Filestore result:", fileResult);
+        } catch (filestoreError) {
+          console.error(
+            "Error with filestore, using direct image URL:",
+            filestoreError
+          );
+
+          // Send filestore warning but continue with direct URL
+          await this.broadcast({
+            type: "image-generation-warning",
+            taskId: requestId,
+            message: "Image ready! Filestore unavailable, using direct URL."
+          });
+        }
+
+        // Save updated task data
+        await this.state.storage.put(`imageTask:${requestId}`, taskData);
+
+        // Send final completion update
+        await this.broadcast({
+          type: "image-generation-completed",
+          taskId: requestId,
+          imageUrl: taskData.imageUrl,
+          fileName: taskData.fileName,
+          message: `✅ Image generation completed! Your image "${taskData.prompt}" is ready.`
+        });
+
+        // Add completion message to chat
+        await this.saveMessages([
+          ...this.messages,
+          {
+            id: generateId(),
+            role: "assistant",
+            parts: [
+              {
+                type: "text",
+                text: `🎨 **Image Generation Complete!**
+
+Your image for "${taskData.prompt}" has been generated successfully!
+
+**Image URL:** ${taskData.imageUrl}
+${taskData.fileName ? `**File Name:** ${taskData.fileName}` : ""}
+
+The image generation process is now complete.`
+              }
+            ],
+            metadata: {
+              createdAt: new Date()
+            }
+          }
+        ]);
+      } else if (status === "failed") {
+        console.error(`Task ${taskId} failed`);
+
+        // Update task status to failed
+        taskData.status = "failed";
+        taskData.updatedAt = new Date();
+        await this.state.storage.put(`imageTask:${requestId}`, taskData);
+
+        // Send failure update
+        await this.broadcast({
+          type: "image-generation-failed",
+          taskId: requestId,
+          message: `❌ Image generation failed for "${taskData.prompt}"`
+        });
+      } else if (status === "processing") {
+        // Still processing, schedule another check in 10 seconds
+        this.schedule(
+          new Date(Date.now() + 10000), // Check again in 10 seconds
+          "pollImageGenerationTask",
+          params
+        );
+
+        // Send periodic progress update
+        await this.broadcast({
+          type: "image-generation-progress",
+          taskId: requestId,
+          message: `🔄 Still generating image for "${taskData.prompt}"...`
+        });
+      }
+    } catch (error) {
+      console.error(`Error polling for task ${taskId}:`, error);
+
+      // Schedule retry in 15 seconds on error
+      this.schedule(
+        new Date(Date.now() + 15000),
+        "pollImageGenerationTask",
+        params
+      );
+
+      // Send error update
+      await this.broadcast({
+        type: "image-generation-error",
+        taskId: requestId,
+        message: `⚠️ Error checking image generation status. Retrying...`
+      });
+    }
   }
 }
 

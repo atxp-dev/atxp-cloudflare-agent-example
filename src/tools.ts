@@ -8,6 +8,11 @@ import { z } from "zod/v3";
 import type { Chat } from "./server";
 import { getCurrentAgent } from "agents";
 import { unstable_scheduleSchema } from "agents/schedule";
+import {
+  generateImage,
+  getImageGenerationStatus,
+  listImageGenerationTasks
+} from "./tools/imageGeneration";
 
 /**
  * Weather information tool that requires human confirmation
@@ -117,7 +122,10 @@ export const tools = {
   getLocalTime,
   scheduleTask,
   getScheduledTasks,
-  cancelScheduledTask
+  cancelScheduledTask,
+  generateImage,
+  getImageGenerationStatus,
+  listImageGenerationTasks
 } satisfies ToolSet;
 
 /**

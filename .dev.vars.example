@@ -1,3 +1,7 @@
 OPENAI_API_KEY=sk-proj-1234567890
 # Optional - Cloudflare AI Gateway https://developers.cloudflare.com/ai-gateway/
 # GATEWAY_BASE_URL=https://gateway.ai.cloudflare.com/v1/..
+
+# Optional - ATXP connection string (JSON format)
+# If not provided, users must provide connection string when using image generation
+# ATXP_CONNECTION_STRING={"accountId":"your-account-id","privateKey":"your-private-key","network":"mainnet","currency":"ETH"}
