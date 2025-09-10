@@ -5,7 +5,8 @@ import type { Chat } from "../server";
 import {
   getATXPConnectionString,
   findATXPAccount,
-  imageService
+  imageService,
+  type ATXPPayment
 } from "../utils/atxp";
 import { atxpClient } from "@atxp/client";
 import { ConsoleLogger, LogLevel } from "@atxp/common";
@@ -65,10 +66,10 @@ export const generateImage = tool({
       const account = findATXPAccount(atxpConnectionString);
 
       // Store initial task state
-      await agent!.state.storage.put(`imageTask:${requestId}`, taskData);
+      await agent!.state.storage.put(`imageTask:${requestId}`, taskData as any);
 
       // Send progress update
-      await agent!.broadcast({
+      await (agent!.broadcast as any)({
         type: "image-generation-started",
         taskId: requestId,
         prompt: prompt,
@@ -80,9 +81,9 @@ export const generateImage = tool({
         mcpServer: imageService.mcpServer,
         account: account,
         logger: new ConsoleLogger({ level: LogLevel.DEBUG }),
-        onPayment: async ({ payment }: { payment: any }) => {
+        onPayment: async ({ payment }: { payment: ATXPPayment }) => {
           console.log("Payment made to image service:", payment);
-          await agent!.broadcast({
+          await (agent!.broadcast as any)({
             type: "payment-update",
             taskId: requestId,
             payment: {
@@ -111,10 +112,10 @@ export const generateImage = tool({
       taskData.taskId = taskId;
       taskData.status = "processing";
       taskData.updatedAt = new Date();
-      await agent!.state.storage.put(`imageTask:${requestId}`, taskData);
+      await agent!.state.storage.put(`imageTask:${requestId}`, taskData as any);
 
       // Send progress update
-      await agent!.broadcast({
+      await (agent!.broadcast as any)({
         type: "image-generation-processing",
         taskId: requestId,
         atxpTaskId: taskId,
@@ -142,10 +143,10 @@ I'll keep you updated on the progress. This usually takes 1-2 minutes to complet
       // Update task status to failed
       taskData.status = "failed";
       taskData.updatedAt = new Date();
-      await agent!.state.storage.put(`imageTask:${requestId}`, taskData);
+      await agent!.state.storage.put(`imageTask:${requestId}`, taskData as any);
 
       // Send error update
-      await agent!.broadcast({
+      await (agent!.broadcast as any)({
         type: "image-generation-error",
         taskId: requestId,
         error: error instanceof Error ? error.message : "Unknown error occurred"
@@ -170,22 +171,23 @@ export const getImageGenerationStatus = tool({
     const { agent } = getCurrentAgent<Chat>();
 
     try {
-      const taskData = await agent!.state.storage.get<ImageGenerationTask>(
+      const taskData = (await agent!.state.storage.get<ImageGenerationTask>(
         `imageTask:${taskId}`
-      );
+      )) as ImageGenerationTask | null;
 
       if (!taskData) {
         return `❌ No image generation task found with ID: ${taskId}`;
       }
 
-      const statusEmoji = {
+      const statusEmoji: Record<string, string> = {
         pending: "⏳",
         processing: "🔄",
         completed: "✅",
         failed: "❌"
-      }[taskData.status];
+      };
+      const emoji = statusEmoji[taskData.status] || "❓";
 
-      let response = `${statusEmoji} **Image Generation Status**
+      let response = `${emoji} **Image Generation Status**
 
 **Task ID:** ${taskData.id}
 **Prompt:** "${taskData.prompt}"
@@ -223,7 +225,9 @@ export const listImageGenerationTasks = tool({
     const { agent } = getCurrentAgent<Chat>();
 
     try {
-      const allKeys = await agent!.state.storage.list({ prefix: "imageTask:" });
+      const allKeys = (await agent!.state.storage.list({
+        prefix: "imageTask:"
+      })) as Map<string, ImageGenerationTask>;
 
       if (allKeys.size === 0) {
         return "📋 No image generation tasks found.";

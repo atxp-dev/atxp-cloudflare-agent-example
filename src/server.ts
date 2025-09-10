@@ -16,7 +16,12 @@ import {
 import { openai } from "@ai-sdk/openai";
 import { processToolCalls, cleanupMessages } from "./utils";
 import { tools, executions } from "./tools";
-import { findATXPAccount, imageService, filestoreService } from "./utils/atxp";
+import {
+  findATXPAccount,
+  imageService,
+  filestoreService,
+  type ATXPPayment
+} from "./utils/atxp";
 import { atxpClient } from "@atxp/client";
 import { ConsoleLogger, LogLevel } from "@atxp/common";
 // import { env } from "cloudflare:workers";
@@ -149,9 +154,9 @@ If the user asks to schedule a task, use the schedule tool to schedule the task.
 
     try {
       // Get the current task data
-      const taskData = await this.state.storage.get<ImageGenerationTask>(
+      const taskData = (await this.state.storage.get<ImageGenerationTask>(
         `imageTask:${requestId}`
-      );
+      )) as ImageGenerationTask | null;
 
       if (!taskData || taskData.status !== "processing") {
         console.log(
@@ -168,9 +173,9 @@ If the user asks to schedule a task, use the schedule tool to schedule the task.
         mcpServer: imageService.mcpServer,
         account: account,
         logger: new ConsoleLogger({ level: LogLevel.DEBUG }),
-        onPayment: async ({ payment }: { payment: any }) => {
+        onPayment: async ({ payment }: { payment: ATXPPayment }) => {
           console.log("Payment made to image service during polling:", payment);
-          await this.broadcast({
+          await (this.broadcast as any)({
             type: "payment-update",
             taskId: requestId,
             payment: {
@@ -206,7 +211,7 @@ If the user asks to schedule a task, use the schedule tool to schedule the task.
         // Try to store in filestore
         try {
           // Send progress update for file storage
-          await this.broadcast({
+          await (this.broadcast as any)({
             type: "image-generation-storing",
             taskId: requestId,
             message: "Storing image in ATXP Filestore..."
@@ -216,9 +221,9 @@ If the user asks to schedule a task, use the schedule tool to schedule the task.
           const filestoreClient = await atxpClient({
             mcpServer: filestoreService.mcpServer,
             account: account,
-            onPayment: async ({ payment }: { payment: any }) => {
+            onPayment: async ({ payment }: { payment: ATXPPayment }) => {
               console.log("Payment made to filestore:", payment);
-              await this.broadcast({
+              await (this.broadcast as any)({
                 type: "payment-update",
                 taskId: requestId,
                 payment: {
@@ -252,7 +257,7 @@ If the user asks to schedule a task, use the schedule tool to schedule the task.
           );
 
           // Send filestore warning but continue with direct URL
-          await this.broadcast({
+          await (this.broadcast as any)({
             type: "image-generation-warning",
             taskId: requestId,
             message: "Image ready! Filestore unavailable, using direct URL."
@@ -260,10 +265,10 @@ If the user asks to schedule a task, use the schedule tool to schedule the task.
         }
 
         // Save updated task data
-        await this.state.storage.put(`imageTask:${requestId}`, taskData);
+        await this.state.storage.put(`imageTask:${requestId}`, taskData as any);
 
         // Send final completion update
-        await this.broadcast({
+        await (this.broadcast as any)({
           type: "image-generation-completed",
           taskId: requestId,
           imageUrl: taskData.imageUrl,
@@ -301,10 +306,10 @@ The image generation process is now complete.`
         // Update task status to failed
         taskData.status = "failed";
         taskData.updatedAt = new Date();
-        await this.state.storage.put(`imageTask:${requestId}`, taskData);
+        await this.state.storage.put(`imageTask:${requestId}`, taskData as any);
 
         // Send failure update
-        await this.broadcast({
+        await (this.broadcast as any)({
           type: "image-generation-failed",
           taskId: requestId,
           message: `❌ Image generation failed for "${taskData.prompt}"`
@@ -318,7 +323,7 @@ The image generation process is now complete.`
         );
 
         // Send periodic progress update
-        await this.broadcast({
+        await (this.broadcast as any)({
           type: "image-generation-progress",
           taskId: requestId,
           message: `🔄 Still generating image for "${taskData.prompt}"...`

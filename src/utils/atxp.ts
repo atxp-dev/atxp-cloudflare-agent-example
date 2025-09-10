@@ -49,6 +49,9 @@ export function findATXPAccount(connectionString: string): ATXPAccount {
 
       return {
         connectionToken: connectionToken,
+        // Required fields for ATXPAccount interface
+        accountId: "", // Empty for URL-based connections
+        privateKey: "", // Empty for URL-based connections
         // Default values for URL-based connections
         network: "mainnet",
         currency: "ETH",
@@ -111,6 +114,26 @@ export function validateATXPConnectionString(connectionString?: string): {
 }
 
 /**
+ * MCP Tool Result interface
+ */
+interface MCPToolResult {
+  content: Array<{ text: string }>;
+}
+
+/**
+ * ATXP Payment information
+ */
+export interface ATXPPayment {
+  accountId: string;
+  resourceUrl: string;
+  resourceName: string;
+  network: string;
+  currency: string;
+  amount: string | number;
+  iss: string;
+}
+
+/**
  * Helper config object for the ATXP Image MCP Server
  */
 export const imageService = {
@@ -119,12 +142,12 @@ export const imageService = {
   getImageAsyncToolName: "image_get_image_async",
   description: "ATXP Image MCP server",
   getArguments: (prompt: string) => ({ prompt }),
-  getAsyncCreateResult: (result: any) => {
+  getAsyncCreateResult: (result: MCPToolResult) => {
     const jsonString = result.content[0].text;
     const parsed = JSON.parse(jsonString);
     return { taskId: parsed.taskId };
   },
-  getAsyncStatusResult: (result: any) => {
+  getAsyncStatusResult: (result: MCPToolResult) => {
     const jsonString = result.content[0].text;
     const parsed = JSON.parse(jsonString);
     return { status: parsed.status, url: parsed.url };
@@ -139,7 +162,7 @@ export const filestoreService = {
   toolName: "filestore_write",
   description: "ATXP Filestore MCP server",
   getArguments: (sourceUrl: string) => ({ sourceUrl, makePublic: true }),
-  getResult: (result: any) => {
+  getResult: (result: MCPToolResult) => {
     // Parse the JSON string from the result
     const jsonString = result.content[0].text;
     return JSON.parse(jsonString);
