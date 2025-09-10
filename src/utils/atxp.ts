@@ -27,6 +27,8 @@ export function getATXPConnectionString(connectionString?: string): string {
 
 /**
  * Parse and validate ATXP connection string to extract account information
+ * Supports both URL format (https://accounts.atxp.ai?connection_token=ABC123)
+ * and legacy JSON format for backwards compatibility
  */
 export function findATXPAccount(connectionString: string): ATXPAccount {
   if (!connectionString || connectionString.trim() === "") {
@@ -34,21 +36,46 @@ export function findATXPAccount(connectionString: string): ATXPAccount {
   }
 
   try {
-    // Parse the connection string as JSON to extract account information
-    const parsed = JSON.parse(connectionString);
+    // Check if it's a URL format (https://accounts.atxp.ai?connection_token=...)
+    if (connectionString.startsWith("https://accounts.atxp.ai")) {
+      const url = new URL(connectionString);
+      const connectionToken = url.searchParams.get("connection_token");
 
-    // Validate required fields
-    if (!parsed.accountId) {
-      throw new Error("ATXP connection string must contain accountId");
+      if (!connectionToken) {
+        throw new Error(
+          "ATXP connection URL must contain connection_token parameter"
+        );
+      }
+
+      return {
+        connectionToken: connectionToken,
+        // Default values for URL-based connections
+        network: "mainnet",
+        currency: "ETH",
+        paymentMakers: []
+      } as ATXPAccount;
     }
 
-    if (!parsed.privateKey) {
-      throw new Error("ATXP connection string must contain privateKey");
+    // Legacy JSON format support
+    const parsed = JSON.parse(connectionString);
+
+    // Validate required fields for JSON format
+    if (!parsed.accountId && !parsed.connectionToken) {
+      throw new Error(
+        "ATXP connection string must contain either accountId or connectionToken"
+      );
+    }
+
+    if (!parsed.connectionToken && !parsed.privateKey) {
+      throw new Error(
+        "ATXP connection string must contain privateKey when using accountId format"
+      );
     }
 
     return {
       accountId: parsed.accountId,
       privateKey: parsed.privateKey,
+      connectionToken: parsed.connectionToken,
       // Optional fields
       network: parsed.network || "mainnet",
       currency: parsed.currency || "ETH",
@@ -57,7 +84,9 @@ export function findATXPAccount(connectionString: string): ATXPAccount {
     } as ATXPAccount;
   } catch (error) {
     if (error instanceof SyntaxError) {
-      throw new Error("ATXP connection string must be valid JSON");
+      throw new Error(
+        "ATXP connection string must be either a valid URL (https://accounts.atxp.ai?connection_token=...) or valid JSON"
+      );
     }
     throw error;
   }

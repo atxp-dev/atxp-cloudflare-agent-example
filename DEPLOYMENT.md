@@ -15,6 +15,7 @@
 ### Local Development
 
 1. **Clone and install dependencies:**
+
    ```bash
    git clone https://github.com/atxp-dev/atxp-cloudflare-agent-example.git
    cd atxp-cloudflare-agent-example
@@ -22,41 +23,48 @@
    ```
 
 2. **Configure environment variables:**
+
    ```bash
    cp .dev.vars.example .dev.vars
    ```
-   
+
    Edit `.dev.vars`:
+
    ```env
    OPENAI_API_KEY=your_openai_api_key
-   ATXP_CONNECTION_STRING={"accountId":"your-account-id","privateKey":"your-private-key"}
+   ATXP_CONNECTION_STRING=https://accounts.atxp.ai?connection_token=your_connection_token_here
    ```
 
 3. **Start development server:**
+
    ```bash
    npm start
    ```
-   
+
    Visit http://localhost:5173 to test the agent.
 
 ### Production Deployment
 
 1. **Install Wrangler CLI:**
+
    ```bash
    npm install -g wrangler
    ```
 
 2. **Login to Cloudflare:**
+
    ```bash
    wrangler login
    ```
 
 3. **Set production secrets:**
+
    ```bash
    wrangler secret bulk .dev.vars
    ```
 
 4. **Deploy:**
+
    ```bash
    npm run deploy
    ```
@@ -64,15 +72,15 @@
 5. **Custom domain (optional):**
    - Go to Cloudflare Workers dashboard
    - Click on your deployed worker
-   - Go to "Settings" > "Triggers" 
+   - Go to "Settings" > "Triggers"
    - Add a custom domain
 
 ### Environment Variables
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `OPENAI_API_KEY` | ✅ | Your OpenAI API key for chat functionality |
-| `ATXP_CONNECTION_STRING` | ❌ | ATXP account connection string (JSON format) |
+| Variable                 | Required | Description                                  |
+| ------------------------ | -------- | -------------------------------------------- |
+| `OPENAI_API_KEY`         | ✅       | Your OpenAI API key for chat functionality   |
+| `ATXP_CONNECTION_STRING` | ❌       | ATXP account connection string (JSON format) |
 
 **Note**: If `ATXP_CONNECTION_STRING` is not set, users must provide it when requesting image generation.
 
@@ -80,8 +88,8 @@
 
 1. Open your deployed URL
 2. Start a conversation with: "Generate an image of a sunset"
-3. If no connection string is set globally, include it: 
-   "Generate an image of a dragon with connection string {your-connection-string}"
+3. If no connection string is set globally, include it:
+   "Generate an image of a dragon with connection string https://accounts.atxp.ai?connection_token=ABC123DEF456"
 
 ### Troubleshooting
 
@@ -112,7 +120,7 @@
 ### Production Considerations
 
 1. **Rate Limiting**: Consider implementing rate limits for production use
-2. **Authentication**: Add user authentication for multi-user deployments  
+2. **Authentication**: Add user authentication for multi-user deployments
 3. **CORS**: Adjust CORS settings for your specific domains
 4. **Monitoring**: Set up alerts for errors and unusual usage patterns
 5. **Costs**: Monitor both Cloudflare Workers and ATXP usage costs

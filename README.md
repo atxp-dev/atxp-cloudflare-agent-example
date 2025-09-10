@@ -51,9 +51,10 @@ Edit `.dev.vars` and add your API keys:
 ```env
 OPENAI_API_KEY=your_openai_api_key
 
-# Optional - ATXP connection string (JSON format)
+# Optional - ATXP connection string (URL format)
 # If not provided, users can provide it when generating images
-ATXP_CONNECTION_STRING={"accountId":"your-account-id","privateKey":"your-private-key","network":"mainnet","currency":"ETH"}
+# Get your connection string from https://console.atxp.ai
+ATXP_CONNECTION_STRING=https://accounts.atxp.ai?connection_token=your_connection_token_here
 ```
 
 4. **Run locally:**
@@ -93,12 +94,12 @@ You can provide your ATXP connection string in two ways:
 1. **Environment Variable** (recommended for single-user deployments):
 
    ```env
-   ATXP_CONNECTION_STRING={"accountId":"...","privateKey":"..."}
+   ATXP_CONNECTION_STRING=https://accounts.atxp.ai?connection_token=your_token_here
    ```
 
 2. **Runtime Parameter** (recommended for multi-user scenarios):
    ```
-   Generate an image of a dragon with connection string {"accountId":"...","privateKey":"..."}
+   Generate an image of a dragon with connection string https://accounts.atxp.ai?connection_token=ABC123DEF456
    ```
 
 ## Project Structure

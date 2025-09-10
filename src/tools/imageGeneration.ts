@@ -39,7 +39,9 @@ export const generateImage = tool({
     connectionString: z
       .string()
       .optional()
-      .describe("ATXP connection string (if not set in environment)")
+      .describe(
+        "ATXP connection string - either URL format (https://accounts.atxp.ai?connection_token=...) or JSON format (if not set in environment)"
+      )
   }),
   execute: async ({ prompt, connectionString }) => {
     const { agent } = getCurrentAgent<Chat>();

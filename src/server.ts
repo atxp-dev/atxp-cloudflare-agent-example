@@ -87,6 +87,12 @@ I have access to the following image generation capabilities:
 - listImageGenerationTasks: List all image generation tasks
 
 When a user asks to generate or create an image, use the generateImage tool with their description as the prompt.
+
+ATXP Connection Strings:
+- If no global connection string is set, users can provide it in the URL format: https://accounts.atxp.ai?connection_token=ABC123DEF456
+- Connection strings can be obtained from https://console.atxp.ai
+- Both URL format (https://accounts.atxp.ai?connection_token=...) and legacy JSON format are supported
+
 I can also schedule tasks for later execution.
 
 ${unstable_getSchedulePrompt({ date: new Date() })}
