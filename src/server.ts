@@ -159,14 +159,7 @@ If the user asks to schedule a task, use the schedule tool to schedule the task.
   }) {
     const { taskId, atxpConnectionString } = params;
 
-    console.log(
-      `[POLLING] Starting poll for task ${taskId} at ${new Date().toISOString()}`
-    );
-
     try {
-      console.log(
-        `[POLLING] Attempting to get task data from storage for ${taskId}`
-      );
       let taskData: ImageGenerationTask | null = null;
 
       try {
@@ -175,17 +168,12 @@ If the user asks to schedule a task, use the schedule tool to schedule the task.
           `imageTask:${taskId}`
         );
         taskData = storageResult as unknown as ImageGenerationTask | null;
-        console.log(`[POLLING] Storage result:`, taskData ? "found" : "null");
       } catch (storageError) {
-        console.error(`[POLLING] Storage access failed:`, storageError);
-        console.log(`[POLLING] Continuing without storage data`);
+        // Storage failed - continue without storage data
         taskData = null;
       }
 
       if (!taskData) {
-        console.log(
-          `[POLLING] Task ${taskId} not found in storage, creating minimal task for polling`
-        );
         // Create a minimal task for polling when storage fails
         taskData = {
           id: taskId,
@@ -197,41 +185,26 @@ If the user asks to schedule a task, use the schedule tool to schedule the task.
         };
       }
 
-      console.log(
-        `[POLLING] Task ${taskId} found with status: ${taskData.status}`
-      );
-
       if (taskData.status !== "running") {
-        console.log(
-          `[POLLING] Task ${taskId} is not in running state (${taskData.status}), stopping polling`
-        );
+        // Task is not running anymore, stop polling
         return;
       }
 
       // Get ATXP account with custom fetch function
-      console.log(`[POLLING] Creating ATXP account with connection string`);
       const account = findATXPAccount(
         atxpConnectionString,
         cloudflareWorkersFetch
       );
-      console.log(`[POLLING] ATXP account created successfully`);
 
       // Create ATXP Image client
       let imageClient: any;
       try {
-        console.log("[POLLING] Creating image client for polling...");
         imageClient = await atxpClient({
           mcpServer: imageService.mcpServer,
           account: account,
-          // Remove logger to avoid __filename issues
-          // logger: new ConsoleLogger({ level: LogLevel.DEBUG }),
           fetchFn: cloudflareWorkersFetch,
           oAuthChannelFetch: cloudflareWorkersFetch,
           onPayment: async ({ payment }: { payment: ATXPPayment }) => {
-            console.log(
-              "Payment made to image service during polling:",
-              payment
-            );
             await this.broadcast(
               JSON.stringify({
                 type: "payment-update",
@@ -249,33 +222,22 @@ If the user asks to schedule a task, use the schedule tool to schedule the task.
             );
           }
         });
-        console.log("[POLLING] Image client created successfully");
       } catch (error) {
         console.error("[POLLING] Failed to create image client:", error);
-        // Don't throw - continue with error handling below
         return;
       }
 
       // Check the status of the image generation
-      console.log(`[POLLING] Calling image status check for task ${taskId}`);
       const statusResult = await imageClient.callTool({
         name: imageService.getImageAsyncToolName,
         arguments: { taskId }
       });
-      console.log(`[POLLING] Got status result from ATXP`);
 
       const { status, url } = imageService.getAsyncStatusResult(
         statusResult as MCPToolResult
       );
-      console.log(
-        `[POLLING] Task ${taskId} status:`,
-        status,
-        url ? "(with URL)" : "(no URL)"
-      );
 
       if (status === "completed" && url) {
-        console.log(`[POLLING] Task ${taskId} completed successfully. URL:`, url);
-
         // Update task with completed status
         taskData.status = "completed";
         taskData.imageUrl = url;
@@ -288,9 +250,8 @@ If the user asks to schedule a task, use the schedule tool to schedule the task.
             `imageTask:${taskId}`,
             taskData as ImageGenerationTask
           );
-          console.log(`[POLLING] Task ${taskId} updated in storage`);
         } catch (storageError) {
-          console.log(`[POLLING] Storage update failed for ${taskId}, continuing anyway`);
+          // Storage update failed, but continue anyway
         }
 
         // Send final completion update
@@ -304,9 +265,8 @@ If the user asks to schedule a task, use the schedule tool to schedule the task.
               message: `✅ Image generation completed! Your image "${taskData.prompt}" is ready.`
             })
           );
-          console.log(`[POLLING] Broadcast sent for completed task ${taskId}`);
         } catch (broadcastError) {
-          console.log(`[POLLING] Broadcast failed for ${taskId}:`, broadcastError);
+          // Broadcast failed, but continue anyway
         }
 
         // Add completion message to chat
@@ -335,25 +295,26 @@ The image generation process is now complete.`
               }
             }
           ]);
-          console.log(`[POLLING] Completion message added to chat for task ${taskId}`);
         } catch (messageError) {
-          console.log(`[POLLING] Failed to add completion message for ${taskId}:`, messageError);
+          console.error(`Failed to add completion message for ${taskId}:`, messageError);
         }
 
-        // IMPORTANT: Return here to stop polling this completed task
-        console.log(`[POLLING] Task ${taskId} completed - stopping polling`);
+        // Stop polling this completed task
         return;
       } else if (status === "failed") {
-        console.error(`Task ${taskId} failed`);
-
         // Update task status to failed
         taskData.status = "failed";
         taskData.updatedAt = new Date();
-        // @ts-expect-error - taskData type assertion issue with Durable Objects storage
-        await this.state.storage.put(
-          `imageTask:${taskId}`,
-          taskData as ImageGenerationTask
-        );
+        
+        try {
+          // @ts-expect-error - taskData type assertion issue with Durable Objects storage
+          await this.state.storage.put(
+            `imageTask:${taskId}`,
+            taskData as ImageGenerationTask
+          );
+        } catch (storageError) {
+          // Storage update failed, but continue anyway
+        }
 
         // Send failure update
         await this.broadcast(
@@ -364,8 +325,7 @@ The image generation process is now complete.`
           })
         );
 
-        // IMPORTANT: Return here to stop polling this failed task
-        console.log(`[POLLING] Task ${taskId} failed - stopping polling`);
+        // Stop polling this failed task
         return;
       } else if (status === "running") {
         // Still processing, schedule another check in 10 seconds

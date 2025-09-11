@@ -38,29 +38,22 @@ export const generateImage = tool({
   }),
   execute: async ({ prompt, connectionString }) => {
     try {
-      console.log(
-        `[IMAGE-GEN] Starting generateImage with prompt: "${prompt}"`
-      );
-
       if (!prompt || prompt.trim() === "") {
         return "Error: Image prompt cannot be empty";
       }
 
       // Get agent to access environment variables
       const { agent } = getCurrentAgent<Chat>();
-      console.log(`[IMAGE-GEN] Got agent: ${!!agent}`);
 
       const atxpConnectionString = getATXPConnectionString(
         connectionString
         // Note: agent.env is protected, so we fall back to process.env in getATXPConnectionString
       );
-      console.log(`[IMAGE-GEN] Got ATXP connection string`);
 
       const account = findATXPAccount(
         atxpConnectionString,
         cloudflareWorkersFetch
       );
-      console.log(`[IMAGE-GEN] Created ATXP account`);
 
       const imageClient = await atxpClient({
         mcpServer: imageService.mcpServer,
@@ -68,27 +61,19 @@ export const generateImage = tool({
         fetchFn: cloudflareWorkersFetch, // Use our custom fetch function
         oAuthChannelFetch: cloudflareWorkersFetch // Explicitly set OAuth channel fetch
       });
-      console.log(`[IMAGE-GEN] Created ATXP image client`);
 
       const asyncResult = await imageClient.callTool({
         name: imageService.createImageAsyncToolName,
         arguments: imageService.getArguments(prompt)
       });
-      console.log(`[IMAGE-GEN] Called createImageAsyncTool, got result`);
 
       const taskId = imageService.getAsyncCreateResult(
         asyncResult as MCPToolResult
       ).taskId;
-      console.log(`[IMAGE-GEN] Extracted taskId: ${taskId}`);
 
       // Store task in agent storage and start polling
       if (agent) {
-        console.log(
-          `[IMAGE-GEN] Agent available, storing task and scheduling polling`
-        );
-
         try {
-          console.log(`[IMAGE-GEN] Creating task object...`);
           const task: ImageGenerationTask = {
             id: generateId(),
             prompt: prompt.trim(),
@@ -97,62 +82,33 @@ export const generateImage = tool({
             createdAt: new Date(),
             updatedAt: new Date()
           };
-          console.log(`[IMAGE-GEN] Task object created`);
 
           // Store task data
-          console.log(`[IMAGE-GEN] Storing task in storage...`);
           try {
             // @ts-expect-error - Durable Objects storage type assertion
             await agent.state.storage.put(`imageTask:${taskId}`, task);
-            console.log(`[IMAGE-GEN] Task stored in storage successfully`);
           } catch (storageError) {
-            console.error(`[IMAGE-GEN] Storage failed:`, storageError);
-            console.log(`[IMAGE-GEN] Continuing without storage...`);
+            console.log(`[IMAGE-GEN] Storage failed, continuing without storage`);
             // Continue without storage - polling can still work
           }
 
-          // Start polling for completion - using shorter interval for testing
-          console.log(`[IMAGE-GEN] Preparing to schedule polling...`);
-          const scheduledTime = new Date(Date.now() + 5000); // Check in 5 seconds
-          console.log(
-            `[IMAGE-GEN] Scheduling polling for task ${taskId} at ${scheduledTime.toISOString()}`
-          );
-
+          // Start polling for completion
+          const scheduledTime = new Date(Date.now() + 10000); // Check in 10 seconds
           const scheduleParams = {
             requestId: generateId(),
             taskId,
             atxpConnectionString
           };
-          console.log(`[IMAGE-GEN] Schedule params created:`, scheduleParams);
 
           agent.schedule(
             scheduledTime,
             "pollImageGenerationTask",
             scheduleParams
           );
-          console.log(
-            `[IMAGE-GEN] Task ${taskId} scheduled for polling successfully`
-          );
-
-          // Test scheduling system - schedule a test log message
-          console.log(`[IMAGE-GEN] Scheduling test task...`);
-          agent.schedule(
-            new Date(Date.now() + 2000), // 2 seconds from now
-            "executeTask",
-            `Test schedule for task ${taskId} - if you see this, scheduling works`
-          );
-          console.log(
-            `[IMAGE-GEN] Test schedule also created for task ${taskId}`
-          );
         } catch (scheduleError) {
-          console.error(
-            `[IMAGE-GEN] Error in storage/scheduling:`,
-            scheduleError
-          );
+          console.error(`[IMAGE-GEN] Error in storage/scheduling:`, scheduleError);
           // Continue without scheduling - the image was created successfully
         }
-      } else {
-        console.log(`[IMAGE-GEN] No agent available, cannot schedule polling`);
       }
 
       // Return task information for the agent to handle
@@ -167,10 +123,9 @@ export const generateImage = tool({
 **Prompt:** "${prompt}"
 **Status:** running
 
-The system will automatically check the progress every 5 seconds and notify you when it's complete. This usually takes 1-2 minutes.`
+The system will automatically check the progress and notify you when it's complete. This usually takes 1-2 minutes.`
       };
 
-      console.log(`[IMAGE-GEN] Returning result for task ${taskId}`);
       return result;
     } catch (error) {
       console.error(`[IMAGE-GEN] Error in generateImage:`, error);

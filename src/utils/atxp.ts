@@ -21,14 +21,6 @@ export function getATXPConnectionString(
   const envConnectionString =
     env?.ATXP_CONNECTION_STRING || process.env.ATXP_CONNECTION_STRING;
 
-  // Add debugging for intermittent issues
-  console.log("[ATXP] Environment check:", {
-    hasCloudflareEnv: !!env?.ATXP_CONNECTION_STRING,
-    hasProcessEnv: !!process.env.ATXP_CONNECTION_STRING,
-    cloudflareValue: env?.ATXP_CONNECTION_STRING ? "[REDACTED]" : undefined,
-    processValue: process.env.ATXP_CONNECTION_STRING ? "[REDACTED]" : undefined
-  });
-
   if (envConnectionString && envConnectionString.trim() !== "") {
     return envConnectionString.trim();
   }
