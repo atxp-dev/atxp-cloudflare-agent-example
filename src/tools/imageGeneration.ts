@@ -88,7 +88,7 @@ Your image generation is now in progress!`
                   }
                 }
               ]);
-            } catch (messageError) {
+            } catch (_messageError) {
               // Continue if message saving fails
             }
           }
@@ -120,8 +120,10 @@ Your image generation is now in progress!`
           try {
             // @ts-expect-error - Durable Objects storage type assertion
             await agent.state.storage.put(`imageTask:${taskId}`, task);
-          } catch (storageError) {
-            console.log(`[IMAGE-GEN] Storage failed, continuing without storage`);
+          } catch (_storageError) {
+            console.log(
+              `[IMAGE-GEN] Storage failed, continuing without storage`
+            );
             // Continue without storage - polling can still work
           }
 
@@ -139,7 +141,10 @@ Your image generation is now in progress!`
             scheduleParams
           );
         } catch (scheduleError) {
-          console.error(`[IMAGE-GEN] Error in storage/scheduling:`, scheduleError);
+          console.error(
+            `[IMAGE-GEN] Error in storage/scheduling:`,
+            scheduleError
+          );
           // Continue without scheduling - the image was created successfully
         }
       }
@@ -223,7 +228,7 @@ Status check complete.`
                   }
                 }
               ]);
-            } catch (messageError) {
+            } catch (_messageError) {
               // Continue if message saving fails
             }
           }

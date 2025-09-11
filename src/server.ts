@@ -168,7 +168,7 @@ If the user asks to schedule a task, use the schedule tool to schedule the task.
           `imageTask:${taskId}`
         );
         taskData = storageResult as unknown as ImageGenerationTask | null;
-      } catch (storageError) {
+      } catch (_storageError) {
         // Storage failed - continue without storage data
         taskData = null;
       }
@@ -197,7 +197,7 @@ If the user asks to schedule a task, use the schedule tool to schedule the task.
       );
 
       // Create ATXP Image client
-      let imageClient: any;
+      let imageClient: Awaited<ReturnType<typeof atxpClient>>;
       try {
         imageClient = await atxpClient({
           mcpServer: imageService.mcpServer,
@@ -248,7 +248,10 @@ Your image generation continues processing...`
                 }
               ]);
             } catch (messageError) {
-              console.error(`Failed to add payment message for ${taskId}:`, messageError);
+              console.error(
+                `Failed to add payment message for ${taskId}:`,
+                messageError
+              );
             }
           }
         });
@@ -280,7 +283,7 @@ Your image generation continues processing...`
             `imageTask:${taskId}`,
             taskData as ImageGenerationTask
           );
-        } catch (storageError) {
+        } catch (_storageError) {
           // Storage update failed, but continue anyway
         }
 
@@ -295,7 +298,7 @@ Your image generation continues processing...`
               message: `✅ Image generation completed! Your image "${taskData.prompt}" is ready.`
             })
           );
-        } catch (broadcastError) {
+        } catch (_broadcastError) {
           // Broadcast failed, but continue anyway
         }
 
@@ -326,7 +329,10 @@ The image generation process is now complete.`
             }
           ]);
         } catch (messageError) {
-          console.error(`Failed to add completion message for ${taskId}:`, messageError);
+          console.error(
+            `Failed to add completion message for ${taskId}:`,
+            messageError
+          );
         }
 
         // Stop polling this completed task
@@ -335,14 +341,14 @@ The image generation process is now complete.`
         // Update task status to failed
         taskData.status = "failed";
         taskData.updatedAt = new Date();
-        
+
         try {
           // @ts-expect-error - taskData type assertion issue with Durable Objects storage
           await this.state.storage.put(
             `imageTask:${taskId}`,
             taskData as ImageGenerationTask
           );
-        } catch (storageError) {
+        } catch (_storageError) {
           // Storage update failed, but continue anyway
         }
 

@@ -169,6 +169,7 @@ Simply ask the AI to generate images:
 ```
 
 The system will:
+
 1. Start the image generation task
 2. Show you the task ID and status
 3. Notify you with a chat message when payment is processed
@@ -187,6 +188,7 @@ The system will:
 You can provide ATXP connection strings in multiple ways:
 
 1. **Environment variable** (recommended for production):
+
    ```env
    ATXP_CONNECTION_STRING=https://accounts.atxp.ai?connection_token=your_token
    ```
