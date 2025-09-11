@@ -1,285 +1,317 @@
-# 🎨 ATXP Cloudflare Agent - AI Image Generation Demo
+# 🤖 Chat Agent Starter Kit
 
 ![npm i agents command](./npm-agents-banner.svg)
 
-<a href="https://deploy.workers.cloudflare.com/?url=https://github.com/atxp-dev/atxp-cloudflare-agent-example"><img src="https://deploy.workers.cloudflare.com/button" alt="Deploy to Cloudflare"/></a>
+<a href="https://deploy.workers.cloudflare.com/?url=https://github.com/cloudflare/agents-starter"><img src="https://deploy.workers.cloudflare.com/button" alt="Deploy to Cloudflare"/></a>
 
-A demo implementation showing how to integrate [ATXP](https://docs.atxp.ai) with Cloudflare Agents for AI-powered image generation. This project demonstrates text-to-image generation using ATXP's Image MCP server, with real-time progress updates and file storage capabilities.
+A starter template for building AI-powered chat agents using Cloudflare's Agent platform, powered by [`agents`](https://www.npmjs.com/package/agents). This project provides a foundation for creating interactive chat experiences with AI, complete with a modern UI and tool integration capabilities.
 
 ## Features
 
-- 🎨 **AI Image Generation**: Generate images from text prompts using ATXP Image MCP server
-- 💬 **Interactive Chat Interface**: Modern chat UI for natural conversations
-- ⚡️ **Real-time Progress Updates**: WebSocket-based progress tracking during image generation
-- 📁 **File Storage**: Automatic storage of generated images using ATXP Filestore
-- 🔄 **Async Processing**: Background polling for long-running image generation tasks
-- 💳 **Payment Tracking**: Real-time display of ATXP payment information
-- 📋 **Task Management**: List, check status, and manage image generation tasks
-- 🌓 **Dark/Light Theme**: Modern, responsive UI with theme support
+- 💬 Interactive chat interface with AI
+- 🛠️ Built-in tool system with human-in-the-loop confirmation
+- 📅 Advanced task scheduling (one-time, delayed, and recurring via cron)
+- 🎨 **AI Image Generation** - Create images from text prompts with automatic completion notifications
+- 🌓 Dark/Light theme support
+- ⚡️ Real-time streaming responses
+- 🔄 State management and chat history
+- 🖼️ Modern, responsive UI with inline image display
 
 ## Prerequisites
 
 - Cloudflare account
 - OpenAI API key
-- ATXP connection string (get from [ATXP Console](https://console.atxp.ai))
+- ATXP account (optional, for AI image generation features) - Get one at [accounts.atxp.ai](https://accounts.atxp.ai)
 
 ## Quick Start
 
-1. **Clone this repository:**
+1. Create a new project:
 
 ```bash
-git clone https://github.com/atxp-dev/atxp-cloudflare-agent-example.git
-cd atxp-cloudflare-agent-example
+npx create-cloudflare@latest --template cloudflare/agents-starter
 ```
 
-2. **Install dependencies:**
+2. Install dependencies:
 
 ```bash
 npm install
 ```
 
-3. **Set up your environment:**
+3. Set up your environment:
 
-Create a `.dev.vars` file from the example:
-
-```bash
-cp .dev.vars.example .dev.vars
-```
-
-Edit `.dev.vars` and add your API keys:
+Create a `.dev.vars` file:
 
 ```env
 OPENAI_API_KEY=your_openai_api_key
-
-# Optional - ATXP connection string (URL format)
-# If not provided, users can provide it when generating images
-# Get your connection string from https://console.atxp.ai
-ATXP_CONNECTION_STRING=https://accounts.atxp.ai?connection_token=your_connection_token_here
+ATXP_CONNECTION_STRING=https://accounts.atxp.ai?connection_token=your_connection_token
 ```
 
-4. **Run locally:**
+**Note:** The ATXP_CONNECTION_STRING is optional and only needed if you want to use the AI image generation features. You can also provide connection strings dynamically through the chat interface.
+
+4. Run locally:
 
 ```bash
 npm start
 ```
 
-5. **Deploy to Cloudflare:**
+5. Deploy:
 
 ```bash
 npm run deploy
 ```
-
-## Usage
-
-### Basic Image Generation
-
-Once the agent is running, you can generate images by chatting with the AI:
-
-- "Generate an image of a sunset over mountains"
-- "Create a picture of a futuristic city"
-- "Draw a cat wearing a space helmet"
-
-### Advanced Features
-
-The agent provides several tools for managing image generation:
-
-1. **generateImage** - Creates images from text prompts
-2. **getImageGenerationStatus** - Checks the status of specific tasks
-3. **listImageGenerationTasks** - Shows all image generation tasks
-
-### ATXP Connection String
-
-You can provide your ATXP connection string in two ways:
-
-1. **Environment Variable** (recommended for single-user deployments):
-
-   ```env
-   ATXP_CONNECTION_STRING=https://accounts.atxp.ai?connection_token=your_token_here
-   ```
-
-2. **Runtime Parameter** (recommended for multi-user scenarios):
-   ```
-   Generate an image of a dragon with connection string https://accounts.atxp.ai?connection_token=ABC123DEF456
-   ```
 
 ## Project Structure
 
 ```
 ├── src/
-│   ├── app.tsx                    # Chat UI implementation
-│   ├── server.ts                  # Chat agent with ATXP integration
-│   ├── tools.ts                   # Tool definitions (includes ATXP tools)
+│   ├── app.tsx              # Chat UI implementation
+│   ├── server.ts            # Chat agent logic with image polling
+│   ├── tools.ts             # Basic tool definitions
 │   ├── tools/
-│   │   └── imageGeneration.ts     # ATXP image generation tools
+│   │   └── imageGeneration.ts  # ATXP image generation tools
 │   ├── utils/
-│   │   └── atxp.ts               # ATXP utility functions
-│   ├── utils.ts                   # General helper functions
-│   └── styles.css                 # UI styling
-├── .dev.vars.example             # Environment variables template
-└── wrangler.jsonc                # Cloudflare Workers configuration
+│   │   └── atxp.ts          # ATXP connection utilities
+│   ├── utils.ts             # Helper functions
+│   └── styles.css           # UI styling
 ```
 
-## How It Works
+## Customization Guide
 
-### Image Generation Flow
+### Adding New Tools
 
-1. **User Request**: User asks for an image through chat
-2. **Tool Execution**: `generateImage` tool is called with the prompt
-3. **ATXP Integration**: Creates ATXP Image MCP client and starts async generation
-4. **Background Polling**: Agent schedules periodic status checks
-5. **Progress Updates**: Real-time WebSocket updates sent to user
-6. **File Storage**: Completed images stored in ATXP Filestore
-7. **Completion Notification**: Final result delivered to chat
+Add new tools in `tools.ts` using the tool builder:
 
-### Key Components
+```ts
+// Example of a tool that requires confirmation
+const searchDatabase = tool({
+  description: "Search the database for user records",
+  parameters: z.object({
+    query: z.string(),
+    limit: z.number().optional()
+  })
+  // No execute function = requires confirmation
+});
 
-- **ATXP Image MCP Server**: Handles AI image generation
-- **ATXP Filestore MCP Server**: Stores and manages generated images
-- **Cloudflare Durable Objects**: Persistent state management for tasks
-- **WebSocket Broadcasting**: Real-time progress updates
-- **Scheduled Tasks**: Background polling for async operations
+// Example of an auto-executing tool
+const getCurrentTime = tool({
+  description: "Get current server time",
+  parameters: z.object({}),
+  execute: async () => new Date().toISOString()
+});
 
-## ATXP Integration Details
-
-This demo showcases several ATXP capabilities:
-
-### Image Generation
-
-- Text-to-image generation using advanced AI models
-- Async processing with task tracking
-- Configurable generation parameters
-
-### File Storage
-
-- Automatic storage of generated images
-- Public URL generation for easy sharing
-- Metadata tracking and file management
-
-### Payment Tracking
-
-- Real-time payment notifications
-- Transparent cost tracking
-- Multi-network support (Ethereum, Polygon, etc.)
-
-### Account Management
-
-- Secure connection string handling
-- Multi-tenant support
-- Network and currency configuration
-
-## Deployment
-
-### Cloudflare Workers
-
-1. **Set up secrets:**
-
-```bash
-# Copy your environment variables to Cloudflare
-wrangler secret bulk .dev.vars
+// Scheduling tool implementation
+const scheduleTask = tool({
+  description:
+    "schedule a task to be executed at a later time. 'when' can be a date, a delay in seconds, or a cron pattern.",
+  parameters: z.object({
+    type: z.enum(["scheduled", "delayed", "cron"]),
+    when: z.union([z.number(), z.string()]),
+    payload: z.string()
+  }),
+  execute: async ({ type, when, payload }) => {
+    // ... see the implementation in tools.ts
+  }
+});
 ```
 
-2. **Deploy:**
+To handle tool confirmations, add execution functions to the `executions` object:
 
-```bash
-npm run deploy
+```typescript
+export const executions = {
+  searchDatabase: async ({
+    query,
+    limit
+  }: {
+    query: string;
+    limit?: number;
+  }) => {
+    // Implementation for when the tool is confirmed
+    const results = await db.search(query, limit);
+    return results;
+  }
+  // Add more execution handlers for other tools that require confirmation
+};
 ```
 
-3. **Configure custom domain (optional):**
+Tools can be configured in two ways:
 
-Add a custom domain in the Cloudflare Workers dashboard for production use.
+1. With an `execute` function for automatic execution
+2. Without an `execute` function, requiring confirmation and using the `executions` object to handle the confirmed action. NOTE: The keys in `executions` should match `toolsRequiringConfirmation` in `app.tsx`.
 
-### Environment Variables
+### AI Image Generation with ATXP
 
-For production deployment, set these environment variables:
+This project includes advanced AI image generation capabilities powered by ATXP (AI Transaction Protocol). The image generation system provides:
 
-- `OPENAI_API_KEY` - Your OpenAI API key
-- `ATXP_CONNECTION_STRING` - Your ATXP connection string (optional)
+- **Automatic background processing** - Images generate asynchronously while you continue chatting
+- **Real-time status updates** - Get notified when generation starts and completes
+- **Inline image display** - Generated images appear directly in the chat
+- **Payment notifications** - Receive chat messages when payments are processed for image generation
+- **Task management** - View all your image generation tasks and their status
 
-## Development
+#### Setting up Image Generation
 
-### Adding New Image Generation Features
+1. **Get an ATXP account** at [accounts.atxp.ai](https://accounts.atxp.ai)
+2. **Copy your connection string** in the format: `https://accounts.atxp.ai?connection_token=your_token`
+3. **Add it to your environment**:
+   ```env
+   ATXP_CONNECTION_STRING=https://accounts.atxp.ai?connection_token=your_token
+   ```
+4. **Deploy your changes** with `wrangler secret put ATXP_CONNECTION_STRING`
 
-You can extend the image generation capabilities by:
+#### Using Image Generation
 
-1. **Adding new tools** in `src/tools/imageGeneration.ts`
-2. **Modifying generation parameters** in the ATXP client configuration
-3. **Customizing progress updates** in the polling logic
-4. **Adding image processing features** using additional ATXP services
+Simply ask the AI to generate images:
 
-### Customizing the UI
+```
+"Generate an image of a sunset over mountains"
+"Create a logo for a coffee shop"
+"Make a picture of a robot playing chess"
+```
 
-The chat interface can be customized in `src/app.tsx`:
+The system will:
 
-- Modify progress display components
-- Add image preview functionality
-- Customize payment information display
-- Add task management UI elements
+1. Start the image generation task
+2. Show you the task ID and status
+3. Notify you with a chat message when payment is processed
+4. Poll for completion automatically every 10 seconds
+5. Notify you when complete with the image displayed inline
+6. Handle any errors gracefully
 
-### Error Handling
+#### Available Image Commands
 
-The implementation includes comprehensive error handling:
+- **Generate images**: "Generate an image of..." or "Create a picture of..."
+- **Check status**: "Check image status" (shows all tasks)
+- **List tasks**: "List my image generation tasks"
 
-- **Connection failures**: Automatic retry logic
-- **Payment issues**: Clear error messages and guidance
-- **Generation failures**: Status tracking and user notification
-- **File storage errors**: Fallback to direct URLs
+#### Connection String Management
 
-## Example Use Cases
+You can provide ATXP connection strings in multiple ways:
 
-### Creative Applications
+1. **Environment variable** (recommended for production):
 
-- **Art Generation**: Create custom artwork for projects
-- **Design Mockups**: Generate design concepts and prototypes
-- **Content Creation**: Produce images for blogs, social media, etc.
-- **Educational Material**: Create visual aids and illustrations
+   ```env
+   ATXP_CONNECTION_STRING=https://accounts.atxp.ai?connection_token=your_token
+   ```
 
-### Business Applications
+2. **Dynamic in chat**: Provide the connection string when generating images:
+   ```
+   "Generate an image of a cat using https://accounts.atxp.ai?connection_token=your_token"
+   ```
 
-- **Marketing Assets**: Generate promotional images and graphics
-- **Product Visualization**: Create product mockups and concepts
-- **Presentation Graphics**: Generate charts, diagrams, and visuals
-- **Brand Assets**: Create logos, icons, and brand imagery
+The system prioritizes dynamically provided connection strings over environment variables.
 
-### Developer Tools
+### Use a different AI model provider
 
-- **UI Mockups**: Generate interface concepts and wireframes
-- **Documentation Images**: Create technical diagrams and screenshots
-- **Testing Assets**: Generate test images for applications
-- **Demo Content**: Create sample images for showcases
+The starting [`server.ts`](https://github.com/cloudflare/agents-starter/blob/main/src/server.ts) implementation uses the [`ai-sdk`](https://sdk.vercel.ai/docs/introduction) and the [OpenAI provider](https://sdk.vercel.ai/providers/ai-sdk-providers/openai), but you can use any AI model provider by:
+
+1. Installing an alternative AI provider for the `ai-sdk`, such as the [`workers-ai-provider`](https://sdk.vercel.ai/providers/community-providers/cloudflare-workers-ai) or [`anthropic`](https://sdk.vercel.ai/providers/ai-sdk-providers/anthropic) provider:
+2. Replacing the AI SDK with the [OpenAI SDK](https://github.com/openai/openai-node)
+3. Using the Cloudflare [Workers AI + AI Gateway](https://developers.cloudflare.com/ai-gateway/providers/workersai/#workers-binding) binding API directly
+
+For example, to use the [`workers-ai-provider`](https://sdk.vercel.ai/providers/community-providers/cloudflare-workers-ai), install the package:
+
+```sh
+npm install workers-ai-provider
+```
+
+Add an `ai` binding to `wrangler.jsonc`:
+
+```jsonc
+// rest of file
+  "ai": {
+    "binding": "AI"
+  }
+// rest of file
+```
+
+Replace the `@ai-sdk/openai` import and usage with the `workers-ai-provider`:
+
+```diff
+// server.ts
+// Change the imports
+- import { openai } from "@ai-sdk/openai";
++ import { createWorkersAI } from 'workers-ai-provider';
+
+// Create a Workers AI instance
++ const workersai = createWorkersAI({ binding: env.AI });
+
+// Use it when calling the streamText method (or other methods)
+// from the ai-sdk
+- const model = openai("gpt-4o-2024-11-20");
++ const model = workersai("@cf/deepseek-ai/deepseek-r1-distill-qwen-32b")
+```
+
+Commit your changes and then run the `agents-starter` as per the rest of this README.
+
+### Modifying the UI
+
+The chat interface is built with React and can be customized in `app.tsx`:
+
+- Modify the theme colors in `styles.css`
+- Add new UI components in the chat container
+- Customize message rendering and tool confirmation dialogs
+- Add new controls to the header
+
+### Example Use Cases
+
+1. **Customer Support Agent**
+   - Add tools for:
+     - Ticket creation/lookup
+     - Order status checking
+     - Product recommendations
+     - FAQ database search
+
+2. **Development Assistant**
+   - Integrate tools for:
+     - Code linting
+     - Git operations
+     - Documentation search
+     - Dependency checking
+
+3. **Data Analysis Assistant**
+   - Build tools for:
+     - Database querying
+     - Data visualization
+     - Statistical analysis
+     - Report generation
+
+4. **Personal Productivity Assistant**
+   - Implement tools for:
+     - Task scheduling with flexible timing options
+     - One-time, delayed, and recurring task management
+     - Task tracking with reminders
+     - Email drafting
+     - Note taking
+
+5. **Scheduling Assistant**
+   - Build tools for:
+     - One-time event scheduling using specific dates
+     - Delayed task execution (e.g., "remind me in 30 minutes")
+     - Recurring tasks using cron patterns
+     - Task payload management
+     - Flexible scheduling patterns
+
+6. **Creative Content Assistant**
+   - Build tools for:
+     - AI image generation with ATXP integration
+     - Text content creation and editing
+     - Visual asset management and storage
+     - Creative project collaboration
+     - Automated content workflows
+
+Each use case can be implemented by:
+
+1. Adding relevant tools in `tools.ts`
+2. Customizing the UI for specific interactions
+3. Extending the agent's capabilities in `server.ts`
+4. Adding any necessary external API integrations
 
 ## Learn More
 
-### ATXP Resources
-
-- [ATXP Documentation](https://docs.atxp.ai)
-- [ATXP Console](https://console.atxp.ai)
-- [ATXP Express Example](https://github.com/atxp-dev/atxp-express-example)
-- [Image MCP Server Documentation](https://docs.atxp.ai/mcp-servers/image)
-- [Filestore MCP Server Documentation](https://docs.atxp.ai/mcp-servers/filestore)
-
-### Cloudflare Resources
-
+- [`agents`](https://github.com/cloudflare/agents/blob/main/packages/agents/README.md)
 - [Cloudflare Agents Documentation](https://developers.cloudflare.com/agents/)
 - [Cloudflare Workers Documentation](https://developers.cloudflare.com/workers/)
-- [Durable Objects Documentation](https://developers.cloudflare.com/durable-objects/)
-
-### Related Examples
-
-- [ATXP Express Example](https://github.com/atxp-dev/atxp-express-example) - Similar functionality using Express.js
-- [ATXP SDK Examples](https://docs.atxp.ai/examples) - Additional integration examples
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly with ATXP services
-5. Submit a pull request
 
 ## License
 
-MIT License - see [LICENSE](LICENSE) for details.
-
----
-
-Built with ❤️ using [ATXP](https://atxp.ai) and [Cloudflare Agents](https://developers.cloudflare.com/agents/)
+MIT

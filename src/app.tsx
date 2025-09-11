@@ -17,20 +17,18 @@ import { ToolInvocationCard } from "@/components/tool-invocation-card/ToolInvoca
 
 // Icon imports
 import {
-  Bug,
-  Moon,
-  Robot,
-  Sun,
-  Trash,
-  PaperPlaneTilt,
-  Stop
+  BugIcon,
+  MoonIcon,
+  RobotIcon,
+  SunIcon,
+  TrashIcon,
+  PaperPlaneTiltIcon,
+  StopIcon
 } from "@phosphor-icons/react";
 
 // List of tools that require human confirmation
 // NOTE: this should match the tools that don't have execute functions in tools.ts
-const toolsRequiringConfirmation: (keyof typeof tools)[] = [
-  "getWeatherInformation"
-];
+const toolsRequiringConfirmation: (keyof typeof tools)[] = [];
 
 export default function Chat() {
   const [theme, setTheme] = useState<"dark" | "light">(() => {
@@ -163,7 +161,7 @@ export default function Chat() {
           </div>
 
           <div className="flex items-center gap-2 mr-2">
-            <Bug size={16} />
+            <BugIcon size={16} />
             <Toggle
               toggled={showDebug}
               aria-label="Toggle debug mode"
@@ -178,7 +176,7 @@ export default function Chat() {
             className="rounded-full h-9 w-9"
             onClick={toggleTheme}
           >
-            {theme === "dark" ? <Sun size={20} /> : <Moon size={20} />}
+            {theme === "dark" ? <SunIcon size={20} /> : <MoonIcon size={20} />}
           </Button>
 
           <Button
@@ -188,7 +186,7 @@ export default function Chat() {
             className="rounded-full h-9 w-9"
             onClick={clearHistory}
           >
-            <Trash size={20} />
+            <TrashIcon size={20} />
           </Button>
         </div>
 
@@ -199,7 +197,7 @@ export default function Chat() {
               <Card className="p-6 max-w-md mx-auto bg-neutral-100 dark:bg-neutral-900">
                 <div className="text-center space-y-4">
                   <div className="bg-[#F48120]/10 text-[#F48120] rounded-full p-3 inline-flex">
-                    <Robot size={24} />
+                    <RobotIcon size={24} />
                   </div>
                   <h3 className="font-semibold text-lg">Welcome to AI Chat</h3>
                   <p className="text-muted-foreground text-sm">
@@ -209,11 +207,7 @@ export default function Chat() {
                   <ul className="text-sm text-left space-y-2">
                     <li className="flex items-center gap-2">
                       <span className="text-[#F48120]">•</span>
-                      <span>Weather information for any city</span>
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <span className="text-[#F48120]">•</span>
-                      <span>Local time in different locations</span>
+                      <span>To generate images</span>
                     </li>
                   </ul>
                 </div>
@@ -395,7 +389,7 @@ export default function Chat() {
                     className="inline-flex items-center cursor-pointer justify-center gap-2 whitespace-nowrap text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 bg-primary text-primary-foreground hover:bg-primary/90 rounded-full p-1.5 h-fit border border-neutral-200 dark:border-neutral-800"
                     aria-label="Stop generation"
                   >
-                    <Stop size={16} />
+                    <StopIcon size={16} />
                   </button>
                 ) : (
                   <button
@@ -404,7 +398,7 @@ export default function Chat() {
                     disabled={pendingToolCallConfirmation || !agentInput.trim()}
                     aria-label="Send message"
                   >
-                    <PaperPlaneTilt size={16} />
+                    <PaperPlaneTiltIcon size={16} />
                   </button>
                 )}
               </div>

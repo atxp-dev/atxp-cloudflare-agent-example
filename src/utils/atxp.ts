@@ -1,4 +1,4 @@
-import type { ATXPAccount } from "@atxp/client";
+import { ATXPAccount } from "@atxp/client";
 
 /**
  * ATXP utility functions for handling connection strings and account validation
@@ -8,14 +8,19 @@ import type { ATXPAccount } from "@atxp/client";
  * Get ATXP connection string from environment variable or provided string
  * Priority: provided connectionString > ATXP_CONNECTION_STRING env var
  */
-export function getATXPConnectionString(connectionString?: string): string {
+export function getATXPConnectionString(
+  connectionString?: string,
+  env?: Env
+): string {
   // First try the provided connection string
   if (connectionString && connectionString.trim() !== "") {
     return connectionString.trim();
   }
 
-  // Fall back to environment variable
-  const envConnectionString = process.env.ATXP_CONNECTION_STRING;
+  // Fall back to Cloudflare Workers environment variable
+  const envConnectionString =
+    env?.ATXP_CONNECTION_STRING || process.env.ATXP_CONNECTION_STRING;
+
   if (envConnectionString && envConnectionString.trim() !== "") {
     return envConnectionString.trim();
   }
@@ -30,7 +35,10 @@ export function getATXPConnectionString(connectionString?: string): string {
  * Supports both URL format (https://accounts.atxp.ai?connection_token=ABC123)
  * and legacy JSON format for backwards compatibility
  */
-export function findATXPAccount(connectionString: string): ATXPAccount {
+export function findATXPAccount(
+  connectionString: string,
+  fetchFn: typeof fetch
+): ATXPAccount {
   if (!connectionString || connectionString.trim() === "") {
     throw new Error("ATXP connection string cannot be empty");
   }
@@ -47,16 +55,8 @@ export function findATXPAccount(connectionString: string): ATXPAccount {
         );
       }
 
-      return {
-        connectionToken: connectionToken,
-        // Required fields for ATXPAccount interface
-        accountId: "", // Empty for URL-based connections
-        privateKey: "", // Empty for URL-based connections
-        // Default values for URL-based connections
-        network: "mainnet",
-        currency: "ETH",
-        paymentMakers: []
-      } as ATXPAccount;
+      // Create a proper ATXPAccount instance with the connection string
+      return new ATXPAccount(connectionString, { fetchFn });
     }
 
     // Legacy JSON format support
@@ -75,16 +75,8 @@ export function findATXPAccount(connectionString: string): ATXPAccount {
       );
     }
 
-    return {
-      accountId: parsed.accountId,
-      privateKey: parsed.privateKey,
-      connectionToken: parsed.connectionToken,
-      // Optional fields
-      network: parsed.network || "mainnet",
-      currency: parsed.currency || "ETH",
-      // Add required field with empty array as default
-      paymentMakers: parsed.paymentMakers || []
-    } as ATXPAccount;
+    // Create a proper ATXPAccount instance with the connection string
+    return new ATXPAccount(connectionString, { fetchFn });
   } catch (error) {
     if (error instanceof SyntaxError) {
       throw new Error(
@@ -96,32 +88,45 @@ export function findATXPAccount(connectionString: string): ATXPAccount {
 }
 
 /**
- * Validate ATXP connection string format and content
+ * MCP Tool Result interface - flexible to handle different content types
  */
-export function validateATXPConnectionString(connectionString?: string): {
-  isValid: boolean;
-  error?: string;
-} {
-  try {
-    const cs = getATXPConnectionString(connectionString);
-    findATXPAccount(cs);
-    return { isValid: true };
-  } catch (error) {
-    const errorMessage =
-      error instanceof Error ? error.message : "Unknown validation error";
-    return { isValid: false, error: errorMessage };
-  }
+export interface MCPToolResult {
+  // biome-ignore lint/suspicious/noExplicitAny: MCP content can be flexible types
+  content: Array<{ text?: string; type?: string; [key: string]: any }>;
+}
+type ImageGenerationStatus = "pending" | "running" | "completed" | "failed";
+/**
+ * Image generation task interface for state management
+ */
+export interface ImageGenerationTask {
+  id: string;
+  prompt: string;
+  status: ImageGenerationStatus;
+  taskId?: string;
+  imageUrl?: string;
+  fileName?: string;
+  fileId?: string;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 /**
- * MCP Tool Result interface
+ * Type guard for ImageGenerationTask
  */
-interface MCPToolResult {
-  content: Array<{ text: string }>;
+export function isImageGenerationTask(
+  obj: unknown
+): obj is ImageGenerationTask {
+  return (
+    obj != null &&
+    typeof obj === "object" &&
+    "id" in obj &&
+    "prompt" in obj &&
+    "status" in obj
+  );
 }
 
 /**
- * ATXP Payment information
+ * ATXP Payment information from @atxp/client
  */
 export interface ATXPPayment {
   accountId: string;
@@ -129,7 +134,8 @@ export interface ATXPPayment {
   resourceName: string;
   network: string;
   currency: string;
-  amount: string | number;
+  // biome-ignore lint/suspicious/noExplicitAny: BigNumber type from @atxp/client
+  amount: any; // BigNumber from @atxp/client
   iss: string;
 }
 
@@ -142,13 +148,15 @@ export const imageService = {
   getImageAsyncToolName: "image_get_image_async",
   description: "ATXP Image MCP server",
   getArguments: (prompt: string) => ({ prompt }),
-  getAsyncCreateResult: (result: MCPToolResult) => {
-    const jsonString = result.content[0].text;
+  getAsyncCreateResult: (result: MCPToolResult): { taskId: string } => {
+    const jsonString = result.content[0].text || "";
     const parsed = JSON.parse(jsonString);
     return { taskId: parsed.taskId };
   },
-  getAsyncStatusResult: (result: MCPToolResult) => {
-    const jsonString = result.content[0].text;
+  getAsyncStatusResult: (
+    result: MCPToolResult
+  ): { status: ImageGenerationStatus; url?: string } => {
+    const jsonString = result.content[0].text || "";
     const parsed = JSON.parse(jsonString);
     return { status: parsed.status, url: parsed.url };
   }
@@ -162,9 +170,11 @@ export const filestoreService = {
   toolName: "filestore_write",
   description: "ATXP Filestore MCP server",
   getArguments: (sourceUrl: string) => ({ sourceUrl, makePublic: true }),
-  getResult: (result: MCPToolResult) => {
+  getResult: (
+    result: MCPToolResult
+  ): { filename: string; url: string; fileId?: string } => {
     // Parse the JSON string from the result
-    const jsonString = result.content[0].text;
+    const jsonString = result.content[0].text || "";
     return JSON.parse(jsonString);
   }
 };
