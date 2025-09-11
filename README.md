@@ -11,15 +11,17 @@ A starter template for building AI-powered chat agents using Cloudflare's Agent 
 - 💬 Interactive chat interface with AI
 - 🛠️ Built-in tool system with human-in-the-loop confirmation
 - 📅 Advanced task scheduling (one-time, delayed, and recurring via cron)
+- 🎨 **AI Image Generation** - Create images from text prompts with automatic completion notifications
 - 🌓 Dark/Light theme support
 - ⚡️ Real-time streaming responses
 - 🔄 State management and chat history
-- 🎨 Modern, responsive UI
+- 🖼️ Modern, responsive UI with inline image display
 
 ## Prerequisites
 
 - Cloudflare account
 - OpenAI API key
+- ATXP account (optional, for AI image generation features) - Get one at [accounts.atxp.ai](https://accounts.atxp.ai)
 
 ## Quick Start
 
@@ -41,7 +43,10 @@ Create a `.dev.vars` file:
 
 ```env
 OPENAI_API_KEY=your_openai_api_key
+ATXP_CONNECTION_STRING=https://accounts.atxp.ai?connection_token=your_connection_token
 ```
+
+**Note:** The ATXP_CONNECTION_STRING is optional and only needed if you want to use the AI image generation features. You can also provide connection strings dynamically through the chat interface.
 
 4. Run locally:
 
@@ -59,11 +64,15 @@ npm run deploy
 
 ```
 ├── src/
-│   ├── app.tsx        # Chat UI implementation
-│   ├── server.ts      # Chat agent logic
-│   ├── tools.ts       # Tool definitions
-│   ├── utils.ts       # Helper functions
-│   └── styles.css     # UI styling
+│   ├── app.tsx              # Chat UI implementation
+│   ├── server.ts            # Chat agent logic with image polling
+│   ├── tools.ts             # Basic tool definitions
+│   ├── tools/
+│   │   └── imageGeneration.ts  # ATXP image generation tools
+│   ├── utils/
+│   │   └── atxp.ts          # ATXP connection utilities
+│   ├── utils.ts             # Helper functions
+│   └── styles.css           # UI styling
 ```
 
 ## Customization Guide
@@ -128,6 +137,64 @@ Tools can be configured in two ways:
 
 1. With an `execute` function for automatic execution
 2. Without an `execute` function, requiring confirmation and using the `executions` object to handle the confirmed action. NOTE: The keys in `executions` should match `toolsRequiringConfirmation` in `app.tsx`.
+
+### AI Image Generation with ATXP
+
+This project includes advanced AI image generation capabilities powered by ATXP (AI Transaction Protocol). The image generation system provides:
+
+- **Automatic background processing** - Images generate asynchronously while you continue chatting
+- **Real-time status updates** - Get notified when generation starts and completes
+- **Inline image display** - Generated images appear directly in the chat
+- **Task management** - View all your image generation tasks and their status
+
+#### Setting up Image Generation
+
+1. **Get an ATXP account** at [accounts.atxp.ai](https://accounts.atxp.ai)
+2. **Copy your connection string** in the format: `https://accounts.atxp.ai?connection_token=your_token`
+3. **Add it to your environment**:
+   ```env
+   ATXP_CONNECTION_STRING=https://accounts.atxp.ai?connection_token=your_token
+   ```
+4. **Deploy your changes** with `wrangler secret put ATXP_CONNECTION_STRING`
+
+#### Using Image Generation
+
+Simply ask the AI to generate images:
+
+```
+"Generate an image of a sunset over mountains"
+"Create a logo for a coffee shop"
+"Make a picture of a robot playing chess"
+```
+
+The system will:
+1. Start the image generation task
+2. Show you the task ID and status
+3. Poll for completion automatically every 10 seconds
+4. Notify you when complete with the image displayed inline
+5. Handle any errors gracefully
+
+#### Available Image Commands
+
+- **Generate images**: "Generate an image of..." or "Create a picture of..."
+- **Check status**: "Check image status" (shows all tasks)
+- **List tasks**: "List my image generation tasks"
+
+#### Connection String Management
+
+You can provide ATXP connection strings in multiple ways:
+
+1. **Environment variable** (recommended for production):
+   ```env
+   ATXP_CONNECTION_STRING=https://accounts.atxp.ai?connection_token=your_token
+   ```
+
+2. **Dynamic in chat**: Provide the connection string when generating images:
+   ```
+   "Generate an image of a cat using https://accounts.atxp.ai?connection_token=your_token"
+   ```
+
+The system prioritizes dynamically provided connection strings over environment variables.
 
 ### Use a different AI model provider
 
@@ -219,6 +286,14 @@ The chat interface is built with React and can be customized in `app.tsx`:
      - Recurring tasks using cron patterns
      - Task payload management
      - Flexible scheduling patterns
+
+6. **Creative Content Assistant**
+   - Build tools for:
+     - AI image generation with ATXP integration
+     - Text content creation and editing
+     - Visual asset management and storage
+     - Creative project collaboration
+     - Automated content workflows
 
 Each use case can be implemented by:
 
