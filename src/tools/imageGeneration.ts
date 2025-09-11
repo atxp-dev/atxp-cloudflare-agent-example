@@ -9,11 +9,11 @@ import {
 import { atxpClient } from "@atxp/client";
 
 export const cloudflareWorkersFetch = async (
-        input: RequestInfo | URL,
-        init?: RequestInit
-      ) => {
-          return  await globalThis.fetch(input, init);
-      }
+  input: RequestInfo | URL,
+  init?: RequestInit
+) => {
+  return await globalThis.fetch(input, init);
+};
 
 /**
  * Generate an image from a text prompt using ATXP Image MCP server
@@ -40,13 +40,14 @@ export const generateImage = tool({
 
     const atxpConnectionString = getATXPConnectionString(connectionString);
     const account = findATXPAccount(
-      atxpConnectionString, cloudflareWorkersFetch
+      atxpConnectionString,
+      cloudflareWorkersFetch
     );
     const imageClient = await atxpClient({
       mcpServer: imageService.mcpServer,
       account: account,
       fetchFn: cloudflareWorkersFetch, // Use our custom fetch function
-      oAuthChannelFetch: cloudflareWorkersFetch, // Explicitly set OAuth channel fetch
+      oAuthChannelFetch: cloudflareWorkersFetch // Explicitly set OAuth channel fetch
     });
 
     const asyncResult = await imageClient.callTool({
@@ -90,7 +91,6 @@ export const getImageGenerationStatus = tool({
       .describe("ATXP connection string (if not set in environment)")
   }),
   execute: async ({ taskId, connectionString }) => {
-
     try {
       const atxpConnectionString = getATXPConnectionString(connectionString);
       const account = findATXPAccount(

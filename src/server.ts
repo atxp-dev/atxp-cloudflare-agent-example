@@ -155,7 +155,10 @@ If the user asks to schedule a task, use the schedule tool to schedule the task.
       }
 
       // Get ATXP account with custom fetch function
-      const account = findATXPAccount(atxpConnectionString, cloudflareWorkersFetch);
+      const account = findATXPAccount(
+        atxpConnectionString,
+        cloudflareWorkersFetch
+      );
 
       // Create ATXP Image client
       let imageClient: any;
@@ -213,7 +216,6 @@ If the user asks to schedule a task, use the schedule tool to schedule the task.
         taskData.status = "completed";
         taskData.imageUrl = url;
         taskData.updatedAt = new Date();
-
 
         // Save updated task data
         // @ts-expect-error - taskData type assertion issue with Durable Objects storage
