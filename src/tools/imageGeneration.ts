@@ -5,7 +5,8 @@ import {
   findATXPAccount,
   imageService,
   type MCPToolResult,
-  type ImageGenerationTask
+  type ImageGenerationTask,
+  type ATXPPayment
 } from "../utils/atxp";
 import { atxpClient } from "@atxp/client";
 import { getCurrentAgent } from "agents";
@@ -59,7 +60,39 @@ export const generateImage = tool({
         mcpServer: imageService.mcpServer,
         account: account,
         fetchFn: cloudflareWorkersFetch, // Use our custom fetch function
-        oAuthChannelFetch: cloudflareWorkersFetch // Explicitly set OAuth channel fetch
+        oAuthChannelFetch: cloudflareWorkersFetch, // Explicitly set OAuth channel fetch
+        onPayment: async ({ payment }: { payment: ATXPPayment }) => {
+          // Add payment notification message to chat
+          if (agent) {
+            try {
+              await agent.saveMessages([
+                ...agent.messages,
+                {
+                  id: generateId(),
+                  role: "assistant",
+                  parts: [
+                    {
+                      type: "text",
+                      text: `💳 **Payment Processed for Image Generation**
+
+A payment has been processed for your image generation request:
+- **Amount:** ${payment.amount.toString()} ${payment.currency}
+- **Network:** ${payment.network}
+- **Service:** ${payment.resourceName}
+
+Your image generation is now in progress!`
+                    }
+                  ],
+                  metadata: {
+                    createdAt: new Date()
+                  }
+                }
+              ]);
+            } catch (messageError) {
+              // Continue if message saving fails
+            }
+          }
+        }
       });
 
       const asyncResult = await imageClient.callTool({
@@ -161,7 +194,40 @@ export const getImageGenerationStatus = tool({
         mcpServer: imageService.mcpServer,
         account: account,
         fetchFn: cloudflareWorkersFetch,
-        oAuthChannelFetch: cloudflareWorkersFetch
+        oAuthChannelFetch: cloudflareWorkersFetch,
+        onPayment: async ({ payment }: { payment: ATXPPayment }) => {
+          // Add payment notification message to chat for status checks
+          const { agent } = getCurrentAgent<Chat>();
+          if (agent) {
+            try {
+              await agent.saveMessages([
+                ...agent.messages,
+                {
+                  id: generateId(),
+                  role: "assistant",
+                  parts: [
+                    {
+                      type: "text",
+                      text: `💳 **Payment Processed for Image Status Check**
+
+A payment has been processed while checking image status (Task ID: ${taskId}):
+- **Amount:** ${payment.amount.toString()} ${payment.currency}
+- **Network:** ${payment.network}
+- **Service:** ${payment.resourceName}
+
+Status check complete.`
+                    }
+                  ],
+                  metadata: {
+                    createdAt: new Date()
+                  }
+                }
+              ]);
+            } catch (messageError) {
+              // Continue if message saving fails
+            }
+          }
+        }
       });
 
       // Call the MCP server to get image status

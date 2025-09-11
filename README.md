@@ -145,6 +145,7 @@ This project includes advanced AI image generation capabilities powered by ATXP 
 - **Automatic background processing** - Images generate asynchronously while you continue chatting
 - **Real-time status updates** - Get notified when generation starts and completes
 - **Inline image display** - Generated images appear directly in the chat
+- **Payment notifications** - Receive chat messages when payments are processed for image generation
 - **Task management** - View all your image generation tasks and their status
 
 #### Setting up Image Generation
@@ -170,9 +171,10 @@ Simply ask the AI to generate images:
 The system will:
 1. Start the image generation task
 2. Show you the task ID and status
-3. Poll for completion automatically every 10 seconds
-4. Notify you when complete with the image displayed inline
-5. Handle any errors gracefully
+3. Notify you with a chat message when payment is processed
+4. Poll for completion automatically every 10 seconds
+5. Notify you when complete with the image displayed inline
+6. Handle any errors gracefully
 
 #### Available Image Commands
 

@@ -205,6 +205,7 @@ If the user asks to schedule a task, use the schedule tool to schedule the task.
           fetchFn: cloudflareWorkersFetch,
           oAuthChannelFetch: cloudflareWorkersFetch,
           onPayment: async ({ payment }: { payment: ATXPPayment }) => {
+            // Send broadcast for real-time updates
             await this.broadcast(
               JSON.stringify({
                 type: "payment-update",
@@ -220,6 +221,35 @@ If the user asks to schedule a task, use the schedule tool to schedule the task.
                 }
               })
             );
+
+            // Add payment notification message to chat
+            try {
+              await this.saveMessages([
+                ...this.messages,
+                {
+                  id: generateId(),
+                  role: "assistant",
+                  parts: [
+                    {
+                      type: "text",
+                      text: `💳 **Payment Processed During Image Generation**
+
+A payment has been processed for your ongoing image generation (Task ID: ${taskId}):
+- **Amount:** ${payment.amount.toString()} ${payment.currency}
+- **Network:** ${payment.network}
+- **Service:** ${payment.resourceName}
+
+Your image generation continues processing...`
+                    }
+                  ],
+                  metadata: {
+                    createdAt: new Date()
+                  }
+                }
+              ]);
+            } catch (messageError) {
+              console.error(`Failed to add payment message for ${taskId}:`, messageError);
+            }
           }
         });
       } catch (error) {
