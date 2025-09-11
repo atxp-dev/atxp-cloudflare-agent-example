@@ -25,7 +25,7 @@ import {
   type ImageGenerationTask
 } from "./utils/atxp";
 import { atxpClient } from "@atxp/client";
-import { ConsoleLogger, LogLevel } from "@atxp/common";
+// Removed unused import
 // import { env } from "cloudflare:workers";
 
 const model = openai("gpt-4o-2024-11-20");
@@ -75,14 +75,31 @@ export class Chat extends AIChatAgent<Env> {
 
 I have access to the following image generation capabilities:
 - generateImage: Create images from text prompts using ATXP Image MCP server
-- getImageGenerationStatus: Check the status of image generation tasks  
+- getImageGenerationStatus: Check the status of a specific image generation task (requires taskId)
+- listImageGenerationTasks: List all image generation tasks
 
-When a user asks to generate or create an image
+CRITICAL RULES FOR IMAGE GENERATION:
+1. When a user asks to generate or create an image:
+   - Use ONLY the generateImage tool with their description as the prompt
+   - After starting, inform the user they'll be automatically notified when complete
+   - DO NOT call any other image tools after generateImage
 
-- use the generateImage tool with their description as the prompt.
-- use the getImageGenerationStatus tool to check the status of the image generation task.
-- check the tool every 10 seconds until the image generation task is completed.
-- notify the user when the image generation task is completed.
+2. When a user asks to "check status" or "check image status" WITHOUT specifying a task ID:
+   - Use listImageGenerationTasks to show all tasks
+   - DO NOT call generateImage or getImageGenerationStatus
+   - DO NOT generate new images
+
+3. When a user asks to check status WITH a specific task ID:
+   - Use getImageGenerationStatus with that taskId
+   - DO NOT call generateImage
+
+4. NEVER call getImageGenerationStatus without a specific taskId
+5. NEVER call generateImage when user asks to check status
+
+The system has automatic background polling that will:
+- Check image generation status every 10 seconds automatically
+- Send completion notifications with inline image display when ready
+- Handle any errors or failures automatically
 
 ATXP Connection Strings:
 - If no global connection string is set, users can provide it in the URL format: https://accounts.atxp.ai?connection_token=ABC123DEF456
@@ -142,23 +159,62 @@ If the user asks to schedule a task, use the schedule tool to schedule the task.
   }) {
     const { taskId, atxpConnectionString } = params;
 
-    try {
-      // @ts-expect-error - Durable Objects storage returns unknown type
-      const storageResult = await this.state.storage.get(`imageTask:${taskId}`);
-      const taskData = storageResult as unknown as ImageGenerationTask | null;
+    console.log(
+      `[POLLING] Starting poll for task ${taskId} at ${new Date().toISOString()}`
+    );
 
-      if (!taskData || taskData.status !== "running") {
+    try {
+      console.log(
+        `[POLLING] Attempting to get task data from storage for ${taskId}`
+      );
+      let taskData: ImageGenerationTask | null = null;
+
+      try {
+        // @ts-expect-error - Durable Objects storage returns unknown type
+        const storageResult = await this.state.storage.get(
+          `imageTask:${taskId}`
+        );
+        taskData = storageResult as unknown as ImageGenerationTask | null;
+        console.log(`[POLLING] Storage result:`, taskData ? "found" : "null");
+      } catch (storageError) {
+        console.error(`[POLLING] Storage access failed:`, storageError);
+        console.log(`[POLLING] Continuing without storage data`);
+        taskData = null;
+      }
+
+      if (!taskData) {
         console.log(
-          `[POLLING] Task ${taskId} is not in processing state, stopping polling`
+          `[POLLING] Task ${taskId} not found in storage, creating minimal task for polling`
+        );
+        // Create a minimal task for polling when storage fails
+        taskData = {
+          id: taskId,
+          prompt: "Generated image",
+          status: "running" as const,
+          taskId,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        };
+      }
+
+      console.log(
+        `[POLLING] Task ${taskId} found with status: ${taskData.status}`
+      );
+
+      if (taskData.status !== "running") {
+        console.log(
+          `[POLLING] Task ${taskId} is not in running state (${taskData.status}), stopping polling`
         );
         return;
       }
 
       // Get ATXP account with custom fetch function
+      console.log(`[POLLING] Creating ATXP account with connection string`);
       const account = findATXPAccount(
         atxpConnectionString,
         cloudflareWorkersFetch
       );
+      console.log(`[POLLING] ATXP account created successfully`);
 
       // Create ATXP Image client
       let imageClient: any;
@@ -167,7 +223,8 @@ If the user asks to schedule a task, use the schedule tool to schedule the task.
         imageClient = await atxpClient({
           mcpServer: imageService.mcpServer,
           account: account,
-          logger: new ConsoleLogger({ level: LogLevel.DEBUG }),
+          // Remove logger to avoid __filename issues
+          // logger: new ConsoleLogger({ level: LogLevel.DEBUG }),
           fetchFn: cloudflareWorkersFetch,
           oAuthChannelFetch: cloudflareWorkersFetch,
           onPayment: async ({ payment }: { payment: ATXPPayment }) => {
@@ -195,56 +252,74 @@ If the user asks to schedule a task, use the schedule tool to schedule the task.
         console.log("[POLLING] Image client created successfully");
       } catch (error) {
         console.error("[POLLING] Failed to create image client:", error);
-        throw error;
+        // Don't throw - continue with error handling below
+        return;
       }
 
       // Check the status of the image generation
+      console.log(`[POLLING] Calling image status check for task ${taskId}`);
       const statusResult = await imageClient.callTool({
         name: imageService.getImageAsyncToolName,
         arguments: { taskId }
       });
+      console.log(`[POLLING] Got status result from ATXP`);
 
       const { status, url } = imageService.getAsyncStatusResult(
         statusResult as MCPToolResult
       );
-      console.log(`Task ${taskId} status:`, status);
+      console.log(
+        `[POLLING] Task ${taskId} status:`,
+        status,
+        url ? "(with URL)" : "(no URL)"
+      );
 
       if (status === "completed" && url) {
-        console.log(`Task ${taskId} completed successfully. URL:`, url);
+        console.log(`[POLLING] Task ${taskId} completed successfully. URL:`, url);
 
         // Update task with completed status
         taskData.status = "completed";
         taskData.imageUrl = url;
         taskData.updatedAt = new Date();
 
-        // Save updated task data
-        // @ts-expect-error - taskData type assertion issue with Durable Objects storage
-        await this.state.storage.put(
-          `imageTask:${taskId}`,
-          taskData as ImageGenerationTask
-        );
+        // Try to save updated task data (but don't fail if storage doesn't work)
+        try {
+          // @ts-expect-error - taskData type assertion issue with Durable Objects storage
+          await this.state.storage.put(
+            `imageTask:${taskId}`,
+            taskData as ImageGenerationTask
+          );
+          console.log(`[POLLING] Task ${taskId} updated in storage`);
+        } catch (storageError) {
+          console.log(`[POLLING] Storage update failed for ${taskId}, continuing anyway`);
+        }
 
         // Send final completion update
-        await this.broadcast(
-          JSON.stringify({
-            type: "image-generation-completed",
-            taskId: taskId,
-            imageUrl: taskData.imageUrl,
-            fileName: taskData.fileName,
-            message: `✅ Image generation completed! Your image "${taskData.prompt}" is ready.`
-          })
-        );
+        try {
+          await this.broadcast(
+            JSON.stringify({
+              type: "image-generation-completed",
+              taskId: taskId,
+              imageUrl: taskData.imageUrl,
+              fileName: taskData.fileName,
+              message: `✅ Image generation completed! Your image "${taskData.prompt}" is ready.`
+            })
+          );
+          console.log(`[POLLING] Broadcast sent for completed task ${taskId}`);
+        } catch (broadcastError) {
+          console.log(`[POLLING] Broadcast failed for ${taskId}:`, broadcastError);
+        }
 
         // Add completion message to chat
-        await this.saveMessages([
-          ...this.messages,
-          {
-            id: generateId(),
-            role: "assistant",
-            parts: [
-              {
-                type: "text",
-                text: `🎨 **Image Generation Complete!**
+        try {
+          await this.saveMessages([
+            ...this.messages,
+            {
+              id: generateId(),
+              role: "assistant",
+              parts: [
+                {
+                  type: "text",
+                  text: `🎨 **Image Generation Complete!**
 
 Your image for "${taskData.prompt}" has been generated successfully!
 
@@ -253,13 +328,21 @@ Your image for "${taskData.prompt}" has been generated successfully!
 ${taskData.fileName ? `**File Name:** ${taskData.fileName}` : ""}
 
 The image generation process is now complete.`
+                }
+              ],
+              metadata: {
+                createdAt: new Date()
               }
-            ],
-            metadata: {
-              createdAt: new Date()
             }
-          }
-        ]);
+          ]);
+          console.log(`[POLLING] Completion message added to chat for task ${taskId}`);
+        } catch (messageError) {
+          console.log(`[POLLING] Failed to add completion message for ${taskId}:`, messageError);
+        }
+
+        // IMPORTANT: Return here to stop polling this completed task
+        console.log(`[POLLING] Task ${taskId} completed - stopping polling`);
+        return;
       } else if (status === "failed") {
         console.error(`Task ${taskId} failed`);
 
@@ -280,6 +363,10 @@ The image generation process is now complete.`
             message: `❌ Image generation failed for "${taskData.prompt}"`
           })
         );
+
+        // IMPORTANT: Return here to stop polling this failed task
+        console.log(`[POLLING] Task ${taskId} failed - stopping polling`);
+        return;
       } else if (status === "running") {
         // Still processing, schedule another check in 10 seconds
         this.schedule(
@@ -327,12 +414,12 @@ export default {
     const url = new URL(request.url);
 
     if (url.pathname === "/check-open-ai-key") {
-      const hasOpenAIKey = !!process.env.OPENAI_API_KEY;
+      const hasOpenAIKey = !!env.OPENAI_API_KEY;
       return Response.json({
         success: hasOpenAIKey
       });
     }
-    if (!process.env.OPENAI_API_KEY) {
+    if (!env.OPENAI_API_KEY) {
       // Note: Using console.error here is acceptable as this runs in the worker entry point
       // where console methods are available and this is a critical startup error
       console.error(

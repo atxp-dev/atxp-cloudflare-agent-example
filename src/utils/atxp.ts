@@ -8,14 +8,27 @@ import { ATXPAccount } from "@atxp/client";
  * Get ATXP connection string from environment variable or provided string
  * Priority: provided connectionString > ATXP_CONNECTION_STRING env var
  */
-export function getATXPConnectionString(connectionString?: string): string {
+export function getATXPConnectionString(
+  connectionString?: string,
+  env?: Env
+): string {
   // First try the provided connection string
   if (connectionString && connectionString.trim() !== "") {
     return connectionString.trim();
   }
 
-  // Fall back to environment variable
-  const envConnectionString = process.env.ATXP_CONNECTION_STRING;
+  // Fall back to Cloudflare Workers environment variable
+  const envConnectionString =
+    env?.ATXP_CONNECTION_STRING || process.env.ATXP_CONNECTION_STRING;
+
+  // Add debugging for intermittent issues
+  console.log("[ATXP] Environment check:", {
+    hasCloudflareEnv: !!env?.ATXP_CONNECTION_STRING,
+    hasProcessEnv: !!process.env.ATXP_CONNECTION_STRING,
+    cloudflareValue: env?.ATXP_CONNECTION_STRING ? "[REDACTED]" : undefined,
+    processValue: process.env.ATXP_CONNECTION_STRING ? "[REDACTED]" : undefined
+  });
+
   if (envConnectionString && envConnectionString.trim() !== "") {
     return envConnectionString.trim();
   }
